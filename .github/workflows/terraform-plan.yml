@@ -1,0 +1,27 @@
+name: Terraform Plan
+
+on:
+  pull_request:
+    paths:
+      - '**/*.tf'
+      - '.github/workflows/**'
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        run: terraform -chdir=environments/dev init -input=false
+
+      - name: Terraform Validate
+        run: terraform -chdir=environments/dev validate
+
+      - name: Terraform Plan
+        run: terraform -chdir=environments/dev plan -no-color
