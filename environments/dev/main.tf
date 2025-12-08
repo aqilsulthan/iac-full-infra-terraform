@@ -12,3 +12,40 @@ module "vpc" {
   vpc_cidr = "10.0.0.0/16"
   azs      = ["ap-southeast-1a", "ap-southeast-1b"]
 }
+
+# Security group for app
+resource "aws_security_group" "app_sg" {
+  name        = "app-sg"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # sementara untuk pengujian
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+module "ec2" {
+  source              = "../../modules/ec2"
+  ami_id              = "ami-0f42f6c9953c7b4b5" # Ubuntu 22.04 - region ap-southeast-1
+  instance_type       = "t3.micro"
+  subnet_ids          = module.vpc.public_subnet_ids
+  security_group_ids  = [aws_security_group.app_sg.id]
+  user_data           = file("${path.module}/../../scripts/bootstrap.sh")
+  instance_count      = 2
+}
+
+module "alb" {
+  source             = "../../modules/alb"
+  vpc_id             = module.vpc.vpc_id
+  public_subnet_ids  = module.vpc.public_subnet_ids
+  target_instance_ids = module.ec2.instance_ids
+}
