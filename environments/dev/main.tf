@@ -41,6 +41,7 @@ module "ec2" {
   security_group_ids  = [aws_security_group.app_sg.id]
   user_data           = file("${path.module}/../../scripts/bootstrap.sh")
   instance_count      = 2
+  instance_profile    = module.iam.instance_profile
 }
 
 module "alb" {
@@ -49,3 +50,48 @@ module "alb" {
   public_subnet_ids  = module.vpc.public_subnet_ids
   target_instance_ids = module.ec2.instance_ids
 }
+
+resource "aws_security_group" "db_sg" {
+  name   = "db-sg"
+  vpc_id = module.vpc.vpc_id
+
+  ingress {
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    security_groups = [aws_security_group.app_sg.id]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+module "db_secret" {
+  source        = "../../modules/secrets"
+  secret_name   = "db-credentials"
+  secret_string = jsonencode({
+    username = "appuser"
+    password = "apppassword123"
+  })
+}
+
+module "db" {
+  source                  = "../../modules/db"
+  db_name                 = "appdb"
+  username                = "appuser"
+  password                = "apppassword123"
+  subnet_ids              = module.vpc.public_subnet_ids
+  vpc_security_group_ids  = [aws_security_group.db_sg.id]
+}
+
+module "iam" {
+  source = "../../modules/iam"
+}
+
+
+
+

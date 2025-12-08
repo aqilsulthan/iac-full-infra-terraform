@@ -23,3 +23,9 @@ variable "instance_count" {
   type    = number
   default = 2
 }
+
+variable "instance_profile" {
+  description = "Name or ARN of the IAM instance profile to attach to instances. Empty string = no profile attached."
+  type        = string
+  default     = ""
+}
