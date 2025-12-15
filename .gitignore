@@ -4,3 +4,4 @@
 .terraform.lock.hcl
 *.log
 .env
+github-oidc-trust.json
