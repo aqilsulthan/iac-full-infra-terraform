@@ -1,6 +1,16 @@
+# terraform {
+#   required_version = ">= 1.5.0"
+#   backend "local" {} # ganti ke s3 backend saat siap
+# }
+
 terraform {
-  required_version = ">= 1.5.0"
-  backend "local" {} # ganti ke s3 backend saat siap
+  backend "s3" {
+    bucket         = "iac-portfolio-tfstate-aqilsulthan-2025"
+    key            = "dev/terraform.tfstate"
+    region         = "ap-southeast-1"
+    dynamodb_table = "terraform-locks"
+    encrypt        = true
+  }
 }
 
 provider "aws" {
