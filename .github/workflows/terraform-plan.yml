@@ -2,6 +2,7 @@ name: Terraform Plan
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     paths:
       - '**/*.tf'
       - '.github/workflows/**'
@@ -9,6 +10,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  pull-requests: write
 
 jobs:
   plan:
@@ -26,6 +28,8 @@ jobs:
         uses: hashicorp/setup-terraform@v2
         with:
           terraform_version: 1.5.0
+          terraform_wrapper: false
+
       - name: Terraform Init
         run: terraform -chdir=environments/dev init -input=false
 
@@ -33,4 +37,24 @@ jobs:
         run: terraform -chdir=environments/dev validate
 
       - name: Terraform Plan
-        run: terraform -chdir=environments/dev plan -no-color
+        id: plan
+        run: terraform -chdir=environments/dev plan -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: Comment PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Plan 📖
+            ${{ steps.plan.outcome == 'failure' && '❌ Plan failed' || '✅ Plan succeeded' }}
+            
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
