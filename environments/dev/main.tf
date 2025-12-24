@@ -17,6 +17,21 @@ provider "aws" {
   region = "ap-southeast-1"
 }
 
+data "aws_ami" "ubuntu_2204" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+}
+
 module "vpc" {
   source   = "../../modules/vpc"
   vpc_cidr = "10.0.0.0/16"
@@ -46,7 +61,7 @@ resource "aws_security_group" "app_sg" {
 module "ec2" {
   count = var.enable_asg ? 0 : 1
   source              = "../../modules/ec2"
-  ami_id              = "ami-0f42f6c9953c7b4b5" # Ubuntu 22.04 - region ap-southeast-1
+  ami_id              = data.aws_ami.ubuntu_2204.id
   instance_type       = "t3.micro"
   subnet_ids          = module.vpc.public_subnet_ids
   security_group_ids  = [aws_security_group.app_sg.id]
@@ -115,7 +130,7 @@ module "asg" {
   source = "../../modules/asg"
 
   name               = "app"
-  ami_id             = "ami-0f42f6c9953c7b4b5" # Ubuntu 22.04 - ap-southeast-1
+  ami_id             = data.aws_ami.ubuntu_2204.id
   subnet_ids         = module.vpc.public_subnet_ids
   security_group_ids = [aws_security_group.app_sg.id]
   instance_profile   = module.iam.instance_profile
