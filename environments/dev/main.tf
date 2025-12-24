@@ -60,6 +60,7 @@ module "alb" {
   vpc_id             = module.vpc.vpc_id
   public_subnet_ids  = module.vpc.public_subnet_ids
   target_instance_ids = var.enable_asg ? [] : module.ec2[0].instance_ids
+  depends_on         = [module.vpc]
 }
 
 resource "aws_security_group" "db_sg" {
@@ -114,7 +115,7 @@ module "asg" {
   source = "../../modules/asg"
 
   name               = "app"
-  ami_id             = "ami-xxxxxxxx"
+  ami_id             = "ami-0f42f6c9953c7b4b5" # Ubuntu 22.04 - ap-southeast-1
   subnet_ids         = module.vpc.public_subnet_ids
   security_group_ids = [aws_security_group.app_sg.id]
   instance_profile   = module.iam.instance_profile
