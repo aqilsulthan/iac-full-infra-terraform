@@ -99,7 +99,7 @@ resource "aws_security_group" "db_sg" {
 
 module "db_secret" {
   source        = "../../modules/secrets"
-  secret_name   = "db-credentials"
+  secret_name   = "dev-db-credentials"
   secret_string = jsonencode({
     username = "appuser"
     password = "apppassword123"
