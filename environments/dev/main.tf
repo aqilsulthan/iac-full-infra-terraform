@@ -1,20 +1,29 @@
-# terraform {
-#   required_version = ">= 1.5.0"
-#   backend "local" {} # ganti ke s3 backend saat siap
-# }
-
 terraform {
-  backend "s3" {
-    bucket         = "iac-portfolio-tfstate-aqilsulthan-2025"
-    key            = "dev/terraform.tfstate"
-    region         = "ap-southeast-1"
-    dynamodb_table = "terraform-locks"
-    encrypt        = true
-  }
+  required_version = ">= 1.5.0"
+  backend "local" {} # ganti ke s3 backend saat siap
 }
 
+# terraform {
+#   backend "s3" {
+#     bucket         = "iac-portfolio-tfstate-aqilsulthan-2025"
+#     key            = "dev/terraform.tfstate"
+#     region         = "ap-southeast-1"
+#     dynamodb_table = "terraform-locks"
+#     encrypt        = true
+#   }
+# }
+
 provider "aws" {
-  region = "ap-southeast-1"
+  region = var.aws_region
+}
+
+# ---- Common Tags (applied to all resources) ----
+locals {
+  common_tags = {
+    Environment = var.environment
+    Project     = var.project_name
+    ManagedBy   = "terraform"
+  }
 }
 
 data "aws_ami" "ubuntu_2204" {
@@ -34,20 +43,23 @@ data "aws_ami" "ubuntu_2204" {
 
 module "vpc" {
   source   = "../../modules/vpc"
-  vpc_cidr = "10.0.0.0/16"
-  azs      = ["ap-southeast-1a", "ap-southeast-1b"]
+  vpc_cidr = var.vpc_cidr
+  azs      = var.azs
+  tags     = local.common_tags
 }
 
 # Security group for app
 resource "aws_security_group" "app_sg" {
-  name        = "app-sg"
+  name        = var.app_sg_name
   vpc_id      = module.vpc.vpc_id
 
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # sementara untuk pengujian
+    # IP dibatasi via variable app_ingress_cidr_blocks
+    # Set di terraform.tfvars atau environment variable
+    cidr_blocks = var.app_ingress_cidr_blocks
   }
 
   egress {
@@ -62,12 +74,13 @@ module "ec2" {
   count = var.enable_asg ? 0 : 1
   source              = "../../modules/ec2"
   ami_id              = data.aws_ami.ubuntu_2204.id
-  instance_type       = "t3.micro"
+  instance_type       = var.instance_type
   subnet_ids          = module.vpc.public_subnet_ids
   security_group_ids  = [aws_security_group.app_sg.id]
   user_data           = file("${path.module}/../../scripts/bootstrap.sh")
-  instance_count      = 2
+  instance_count      = var.instance_count
   instance_profile    = module.iam.instance_profile
+  tags                = local.common_tags
 }
 
 module "alb" {
@@ -75,11 +88,12 @@ module "alb" {
   vpc_id             = module.vpc.vpc_id
   public_subnet_ids  = module.vpc.public_subnet_ids
   target_instance_ids = var.enable_asg ? [] : module.ec2[0].instance_ids
+  tags               = local.common_tags
   depends_on         = [module.vpc]
 }
 
 resource "aws_security_group" "db_sg" {
-  name   = "db-sg"
+  name   = var.db_sg_name
   vpc_id = module.vpc.vpc_id
 
   ingress {
@@ -97,31 +111,42 @@ resource "aws_security_group" "db_sg" {
   }
 }
 
+# Buat secret di AWS Secrets Manager
 module "db_secret" {
   source        = "../../modules/secrets"
-  secret_name   = "dev-db-credentials"
+  secret_name   = var.db_secret_name
   secret_string = jsonencode({
-    username = "appuser"
-    password = "apppassword123"
+    username = var.db_username
+    password = var.db_password
   })
+}
+
+# Baca secret dari AWS Secrets Manager (runtime, bukan hardcode)
+data "aws_secretsmanager_secret_version" "db_creds" {
+  secret_id  = module.db_secret.secret_arn
+  depends_on = [module.db_secret]
+}
+
+# Parse JSON secret ke local values
+locals {
+  db_creds = jsondecode(
+    data.aws_secretsmanager_secret_version.db_creds.secret_string
+  )
 }
 
 module "db" {
   source                  = "../../modules/db"
-  db_name                 = "appdb"
-  username                = "appuser"
-  password                = "apppassword123"
-  subnet_ids              = module.vpc.public_subnet_ids
+  db_name                 = var.db_name
+  username                = local.db_creds.username
+  password                = local.db_creds.password
+  subnet_ids              = module.vpc.private_subnet_ids
   vpc_security_group_ids  = [aws_security_group.db_sg.id]
+  tags                    = local.common_tags
 }
 
 module "iam" {
   source = "../../modules/iam"
-}
-
-variable "enable_asg" {
-  type    = bool
-  default = true
+  tags   = local.common_tags
 }
 
 module "asg" {
@@ -129,38 +154,39 @@ module "asg" {
 
   source = "../../modules/asg"
 
-  name               = "app"
+  name               = var.asg_app_name
   ami_id             = data.aws_ami.ubuntu_2204.id
   subnet_ids         = module.vpc.public_subnet_ids
   security_group_ids = [aws_security_group.app_sg.id]
   instance_profile   = module.iam.instance_profile
 
-  desired_capacity = 2
-  min_size         = 2
-  max_size         = 4
+  desired_capacity = var.asg_desired_capacity
+  min_size         = var.asg_min_size
+  max_size         = var.asg_max_size
 
   user_data = file("${path.module}/../../scripts/bootstrap.sh")
 
   target_group_arns = [module.alb.target_group_arn]
+  tags              = local.common_tags
 }
 
 resource "aws_autoscaling_policy" "scale_out" {
   name                   = "scale-out"
-  scaling_adjustment     = 1
+  scaling_adjustment     = var.scale_out_adjustment
   adjustment_type        = "ChangeInCapacity"
-  cooldown               = 60
+  cooldown               = var.scale_out_cooldown
   autoscaling_group_name = module.asg[0].asg_name
 }
 
 resource "aws_cloudwatch_metric_alarm" "cpu_high" {
   alarm_name          = "cpu-high"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 2
+  evaluation_periods  = var.cpu_high_evaluation_periods
   metric_name         = "CPUUtilization"
   namespace           = "AWS/EC2"
-  period              = 60
+  period              = var.cpu_high_period
   statistic           = "Average"
-  threshold           = 70
+  threshold           = var.cpu_high_threshold
 
   dimensions = {
     AutoScalingGroupName = module.asg[0].asg_name

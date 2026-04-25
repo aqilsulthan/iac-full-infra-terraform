@@ -1,6 +1,10 @@
 resource "aws_db_subnet_group" "db_subnet_group" {
   name       = "app-db-subnet-group"
   subnet_ids = var.subnet_ids
+
+  tags = merge(var.tags, {
+    Name = "app-db-subnet-group"
+  })
 }
 
 resource "aws_db_instance" "app_db" {
@@ -17,4 +21,12 @@ resource "aws_db_instance" "app_db" {
 
   publicly_accessible     = false
   skip_final_snapshot     = true
+
+  tags = merge(var.tags, {
+    Name = "app-db"
+  })
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

@@ -10,11 +10,18 @@ resource "aws_launch_template" "this" {
 
   vpc_security_group_ids = var.security_group_ids
 
-  tag_specifications {
+    tag_specifications {
     resource_type = "instance"
-    tags = {
+    tags = merge(var.tags, {
       Name = "${var.name}-instance"
-    }
+    })
+  }
+
+  tag_specifications {
+    resource_type = "volume"
+    tags = merge(var.tags, {
+      Name = "${var.name}-volume"
+    })
   }
 }
 
@@ -35,9 +42,14 @@ resource "aws_autoscaling_group" "this" {
   health_check_type         = "ELB"
   health_check_grace_period = 60
 
-  tag {
-    key                 = "Name"
-    value               = "${var.name}-asg"
-    propagate_at_launch = true
+    dynamic "tag" {
+    for_each = merge(var.tags, {
+      Name = "${var.name}-asg"
+    })
+    content {
+      key                 = tag.key
+      value               = tag.value
+      propagate_at_launch = true
+    }
   }
 }

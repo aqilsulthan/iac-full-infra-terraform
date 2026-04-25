@@ -2,6 +2,10 @@ resource "aws_lb" "app_lb" {
   name               = "app-lb"
   load_balancer_type = "application"
   subnets            = var.public_subnet_ids
+
+  tags = merge(var.tags, {
+    Name = "app-lb"
+  })
 }
 
 resource "aws_lb_target_group" "app_tg" {
@@ -13,6 +17,10 @@ resource "aws_lb_target_group" "app_tg" {
   health_check {
     path = "/health"
   }
+
+  tags = merge(var.tags, {
+    Name = "app-tg"
+  })
 }
 
 resource "aws_lb_listener" "http" {

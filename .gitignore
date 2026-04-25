@@ -1,7 +1,10 @@
 .terraform/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
 *.log
 .env
 github-oidc-trust.json
+**/tfplan
+*.tfplan
+package.json
+package-lock.json

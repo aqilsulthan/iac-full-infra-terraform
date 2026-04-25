@@ -15,3 +15,9 @@ variable "instance_class" {
 }
 variable "subnet_ids" { type = list(string) }
 variable "vpc_security_group_ids" { type = list(string) }
+
+variable "tags" {
+  description = "Tags tambahan untuk semua resource DB"
+  type        = map(string)
+  default     = {}
+}

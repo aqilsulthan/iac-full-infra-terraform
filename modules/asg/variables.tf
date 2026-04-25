@@ -33,3 +33,9 @@ variable "user_data" { type = string }
 variable "target_group_arns" {
   type = list(string)
 }
+
+variable "tags" {
+  description = "Tags tambahan untuk semua resource ASG"
+  type        = map(string)
+  default     = {}
+}

@@ -29,3 +29,9 @@ variable "instance_profile" {
   type        = string
   default     = ""
 }
+
+variable "tags" {
+  description = "Tags tambahan untuk semua resource EC2"
+  type        = map(string)
+  default     = {}
+}

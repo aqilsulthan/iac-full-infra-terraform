@@ -12,8 +12,14 @@ resource "aws_launch_template" "app" {
     for_each = var.instance_profile != "" ? [1] : []
     content {
       name = var.instance_profile
-      # or use arn = var.instance_profile if pass an ARN
     }
+  }
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = merge(var.tags, {
+      Name = "app-instance"
+    })
   }
 }
 
@@ -27,7 +33,7 @@ resource "aws_instance" "app" {
 
   iam_instance_profile = var.instance_profile != "" ? var.instance_profile : null
 
-  tags = {
+    tags = merge(var.tags, {
     Name = "app-instance-${count.index}"
-  }
+  })
 }
