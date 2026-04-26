@@ -7,7 +7,7 @@ terraform {
 #   backend "s3" {
 #     bucket         = "iac-portfolio-tfstate-aqilsulthan-2025"
 #     key            = "dev/terraform.tfstate"
-#     region         = "ap-southeast-1"
+#     region         = "ap-southeast-3"
 #     dynamodb_table = "terraform-locks"
 #     encrypt        = true
 #   }
@@ -24,6 +24,26 @@ locals {
     Project     = var.project_name
     ManagedBy   = "terraform"
   }
+
+  bootstrap_user_data = replace(
+    replace(
+      replace(
+        replace(
+          replace(
+            replace(
+              replace(file("${path.module}/../../scripts/bootstrap.sh"), "__APP_NAME__", var.project_name),
+              "__AWS_REGION__", var.aws_region
+            ),
+            "__DB_HOST__", module.db.endpoint
+          ),
+          "__DB_NAME__", var.db_name
+        ),
+        "__DB_SECRET_NAME__", var.db_secret_name
+      ),
+      "__ENVIRONMENT__", var.environment
+    ),
+    "__PROJECT_NAME__", var.project_name
+  )
 }
 
 data "aws_ami" "ubuntu_2204" {
@@ -42,24 +62,32 @@ data "aws_ami" "ubuntu_2204" {
 }
 
 module "vpc" {
-  source   = "../../modules/vpc"
-  vpc_cidr = var.vpc_cidr
-  azs      = var.azs
-  tags     = local.common_tags
+  source             = "../../modules/vpc"
+  vpc_cidr           = var.vpc_cidr
+  azs                = var.azs
+  enable_nat_gateway = var.enable_nat_gateway
+  tags               = local.common_tags
 }
 
 # Security group for app
 resource "aws_security_group" "app_sg" {
-  name        = var.app_sg_name
-  vpc_id      = module.vpc.vpc_id
+  name   = var.app_sg_name
+  vpc_id = module.vpc.vpc_id
 
+  # Allow traffic from user IP (direct admin access)
   ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    # IP dibatasi via variable app_ingress_cidr_blocks
-    # Set di terraform.tfvars atau environment variable
     cidr_blocks = var.app_ingress_cidr_blocks
+  }
+
+  # Allow traffic from ALB in VPC (health checks + forwarding)
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   egress {
@@ -71,25 +99,25 @@ resource "aws_security_group" "app_sg" {
 }
 
 module "ec2" {
-  count = var.enable_asg ? 0 : 1
-  source              = "../../modules/ec2"
-  ami_id              = data.aws_ami.ubuntu_2204.id
-  instance_type       = var.instance_type
-  subnet_ids          = module.vpc.public_subnet_ids
-  security_group_ids  = [aws_security_group.app_sg.id]
-  user_data           = file("${path.module}/../../scripts/bootstrap.sh")
-  instance_count      = var.instance_count
-  instance_profile    = module.iam.instance_profile
-  tags                = local.common_tags
+  count              = var.enable_asg ? 0 : 1
+  source             = "../../modules/ec2"
+  ami_id             = data.aws_ami.ubuntu_2204.id
+  instance_type      = var.instance_type
+  subnet_ids         = module.vpc.public_subnet_ids
+  security_group_ids = [aws_security_group.app_sg.id]
+  user_data          = local.bootstrap_user_data
+  instance_count     = var.instance_count
+  instance_profile   = module.iam.instance_profile
+  tags               = local.common_tags
 }
 
 module "alb" {
-  source             = "../../modules/alb"
-  vpc_id             = module.vpc.vpc_id
-  public_subnet_ids  = module.vpc.public_subnet_ids
+  source              = "../../modules/alb"
+  vpc_id              = module.vpc.vpc_id
+  public_subnet_ids   = module.vpc.public_subnet_ids
   target_instance_ids = var.enable_asg ? [] : module.ec2[0].instance_ids
-  tags               = local.common_tags
-  depends_on         = [module.vpc]
+  tags                = local.common_tags
+  depends_on          = [module.vpc]
 }
 
 resource "aws_security_group" "db_sg" {
@@ -97,9 +125,9 @@ resource "aws_security_group" "db_sg" {
   vpc_id = module.vpc.vpc_id
 
   ingress {
-    from_port   = 3306
-    to_port     = 3306
-    protocol    = "tcp"
+    from_port       = 3306
+    to_port         = 3306
+    protocol        = "tcp"
     security_groups = [aws_security_group.app_sg.id]
   }
 
@@ -113,8 +141,8 @@ resource "aws_security_group" "db_sg" {
 
 # Buat secret di AWS Secrets Manager
 module "db_secret" {
-  source        = "../../modules/secrets"
-  secret_name   = var.db_secret_name
+  source      = "../../modules/secrets"
+  secret_name = var.db_secret_name
   secret_string = jsonencode({
     username = var.db_username
     password = var.db_password
@@ -135,13 +163,13 @@ locals {
 }
 
 module "db" {
-  source                  = "../../modules/db"
-  db_name                 = var.db_name
-  username                = local.db_creds.username
-  password                = local.db_creds.password
-  subnet_ids              = module.vpc.private_subnet_ids
-  vpc_security_group_ids  = [aws_security_group.db_sg.id]
-  tags                    = local.common_tags
+  source                 = "../../modules/db"
+  db_name                = var.db_name
+  username               = local.db_creds.username
+  password               = local.db_creds.password
+  subnet_ids             = module.vpc.private_subnet_ids
+  vpc_security_group_ids = [aws_security_group.db_sg.id]
+  tags                   = local.common_tags
 }
 
 module "iam" {
@@ -156,6 +184,7 @@ module "asg" {
 
   name               = var.asg_app_name
   ami_id             = data.aws_ami.ubuntu_2204.id
+  instance_type      = var.instance_type
   subnet_ids         = module.vpc.public_subnet_ids
   security_group_ids = [aws_security_group.app_sg.id]
   instance_profile   = module.iam.instance_profile
@@ -164,13 +193,14 @@ module "asg" {
   min_size         = var.asg_min_size
   max_size         = var.asg_max_size
 
-  user_data = file("${path.module}/../../scripts/bootstrap.sh")
+  user_data = local.bootstrap_user_data
 
   target_group_arns = [module.alb.target_group_arn]
   tags              = local.common_tags
 }
 
 resource "aws_autoscaling_policy" "scale_out" {
+  count                  = var.enable_asg ? 1 : 0
   name                   = "scale-out"
   scaling_adjustment     = var.scale_out_adjustment
   adjustment_type        = "ChangeInCapacity"
@@ -179,6 +209,7 @@ resource "aws_autoscaling_policy" "scale_out" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "cpu_high" {
+  count               = var.enable_asg ? 1 : 0
   alarm_name          = "cpu-high"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = var.cpu_high_evaluation_periods
@@ -192,9 +223,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
     AutoScalingGroupName = module.asg[0].asg_name
   }
 
-  alarm_actions = [aws_autoscaling_policy.scale_out.arn]
+  alarm_actions = [aws_autoscaling_policy.scale_out[0].arn]
 }
-
-
 
 

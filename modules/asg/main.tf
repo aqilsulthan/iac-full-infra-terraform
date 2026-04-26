@@ -10,7 +10,7 @@ resource "aws_launch_template" "this" {
 
   vpc_security_group_ids = var.security_group_ids
 
-    tag_specifications {
+  tag_specifications {
     resource_type = "instance"
     tags = merge(var.tags, {
       Name = "${var.name}-instance"
@@ -36,13 +36,20 @@ resource "aws_autoscaling_group" "this" {
 
   launch_template {
     id      = aws_launch_template.this.id
-    version = "$Latest"
+    version = aws_launch_template.this.latest_version
   }
 
   health_check_type         = "ELB"
-  health_check_grace_period = 60
+  health_check_grace_period = 300
 
-    dynamic "tag" {
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 50
+    }
+  }
+
+  dynamic "tag" {
     for_each = merge(var.tags, {
       Name = "${var.name}-asg"
     })

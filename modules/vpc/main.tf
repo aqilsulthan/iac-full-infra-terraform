@@ -18,8 +18,8 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = merge(var.tags, {
-    Name        = "public-subnet-${count.index}"
-    Tier        = "public"
+    Name = "public-subnet-${count.index}"
+    Tier = "public"
   })
 }
 
@@ -32,8 +32,8 @@ resource "aws_subnet" "private" {
   map_public_ip_on_launch = false
 
   tags = merge(var.tags, {
-    Name        = "private-subnet-${count.index}"
-    Tier        = "private"
+    Name = "private-subnet-${count.index}"
+    Tier = "private"
   })
 }
 
@@ -48,7 +48,7 @@ resource "aws_internet_gateway" "this" {
 
 # ---- Elastic IP + NAT Gateway ----
 resource "aws_eip" "nat" {
-  count = var.enable_nat_gateway ? 1 : 0
+  count  = var.enable_nat_gateway ? 1 : 0
   domain = "vpc"
 
   tags = merge(var.tags, {
@@ -59,7 +59,7 @@ resource "aws_eip" "nat" {
 resource "aws_nat_gateway" "this" {
   count         = var.enable_nat_gateway ? 1 : 0
   allocation_id = aws_eip.nat[0].id
-  subnet_id     = aws_subnet.public[0].id  # NAT di public subnet pertama
+  subnet_id     = aws_subnet.public[0].id # NAT di public subnet pertama
 
   tags = merge(var.tags, {
     Name = "iac-demo-nat"

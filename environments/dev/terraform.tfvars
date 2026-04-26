@@ -3,15 +3,16 @@
 # ============================================================
 
 # ---- AWS Provider ----
-aws_region = "ap-southeast-1"
+aws_region = "ap-southeast-3"
 
 # ---- VPC ----
-vpc_cidr = "10.0.0.0/16"
-azs      = ["ap-southeast-1a", "ap-southeast-1b"]
+vpc_cidr           = "10.0.0.0/16"
+azs                = ["ap-southeast-3a", "ap-southeast-3b"]
+enable_nat_gateway = false
 
 # ---- EC2 / Compute ----
-instance_type   = "t3.micro"
-instance_count  = 2
+instance_type  = "t3.micro"
+instance_count = 2
 
 # ---- Auto Scaling Group ----
 enable_asg           = true
@@ -36,7 +37,7 @@ cpu_high_period             = 60
 # ═══════════════════════════════════════════════════════
 # ⚠️  Saat ini: 0.0.0.0/0 = TERBUKA UNTUK SEMUA
 #    Ganti sebelum staging/prod!
-app_ingress_cidr_blocks = ["36.71.225.181/32"]  # my ip
+app_ingress_cidr_blocks = ["36.71.225.181/32"] # my ip
 app_sg_name             = "app-sg"
 db_sg_name              = "db-sg"
 
@@ -56,5 +57,5 @@ state_key            = "dev/terraform.tfstate"
 state_dynamodb_table = "terraform-locks"
 
 # ---- Tags ----
-environment = "dev"
+environment  = "dev"
 project_name = "iac-full-infra"

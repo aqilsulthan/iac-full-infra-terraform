@@ -9,10 +9,16 @@
 set -euo pipefail
 
 # ---- Configuration ----
-APP_NAME="Terraform App"
+APP_NAME="__APP_NAME__"
 APP_DIR="/opt/app"
 LOG_FILE="/var/log/app-bootstrap.log"
 CW_AGENT_CONFIG="/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json"
+DEFAULT_REGION="__AWS_REGION__"
+DEFAULT_DB_HOST="__DB_HOST__"
+DEFAULT_DB_NAME="__DB_NAME__"
+DEFAULT_DB_SECRET_NAME="__DB_SECRET_NAME__"
+DEFAULT_PROJECT_NAME="__PROJECT_NAME__"
+DEFAULT_ENVIRONMENT="__ENVIRONMENT__"
 
 # ---- Logging Function ----
 log() {
@@ -32,7 +38,15 @@ error() { log "ERROR" "$1"; }
 
 get_instance_metadata() {
     local path="$1"
-    curl -s -f "http://169.254.169.254/latest/meta-data/${path}" 2>/dev/null || echo "unknown"
+    local token
+    token="$(curl -s -f -X PUT "http://169.254.169.254/latest/api/token" \
+        -H "X-aws-ec2-metadata-token-ttl-seconds: 21600" 2>/dev/null || true)"
+    if [ -n "$token" ]; then
+        curl -s -f -H "X-aws-ec2-metadata-token: ${token}" \
+            "http://169.254.169.254/latest/meta-data/${path}" 2>/dev/null || echo "unknown"
+    else
+        curl -s -f "http://169.254.169.254/latest/meta-data/${path}" 2>/dev/null || echo "unknown"
+    fi
 }
 
 get_aws_region() {
@@ -41,21 +55,7 @@ get_aws_region() {
     if [ "$az" != "unknown" ]; then
         echo "${az%?}"
     else
-        echo "ap-southeast-1"
-    fi
-}
-
-get_rds_endpoint() {
-    local region="$1"
-    local project="$2"
-    local env="$3"
-    local endpoint
-    endpoint="$(aws rds describe-db-instances \
-        --region "${region}" \
-        --query "DBInstances[?contains(Tags[?Key=='Project'].Value, '${project}') && contains(Tags[?Key=='Environment'].Value, '${env}')] | [0].Endpoint.Address" \
-        --output text 2>/dev/null)" || endpoint=""
-    if [ -n "$endpoint" ] && [ "$endpoint" != "None" ]; then
-        echo "$endpoint"
+        echo "${DEFAULT_REGION}"
     fi
 }
 
@@ -64,7 +64,7 @@ install_dependencies() {
     info "Phase 1: Installing system dependencies..."
     apt-get update -y
     apt-get install -y \
-        python3 python3-pip python3-venv nginx mysql-client \
+        python3 python3-pip python3-venv nginx default-mysql-client \
         curl jq awscli
     info "System dependencies installed successfully"
 }
@@ -79,32 +79,136 @@ setup_app() {
     source venv/bin/activate
     pip install --no-cache-dir flask gunicorn pymysql 2>&1 | tee -a "${LOG_FILE}"
 
-    info "Downloading Flask application from GitHub..."
-    local APP_URL="https://raw.githubusercontent.com/aqilsulthan/iac-full-infra-terraform/main/scripts/app.py"
-    if curl -sf -o "${APP_DIR}/app.py" "${APP_URL}"; then
-        info "Flask application downloaded from GitHub"
-    else
-        warn "GitHub download failed, creating minimal fallback app..."
-        cat > "${APP_DIR}/app.py" << 'FALLBACK'
-import os,sys,json,socket,subprocess
+    info "Creating Flask application..."
+    cat > "${APP_DIR}/app.py" << 'PYAPP'
+import os
+import json
+import socket
+import subprocess
 from datetime import datetime
-from flask import Flask,jsonify
-app=Flask(__name__)
-INSTANCE_ID=os.popen('curl -s http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null').read().strip() or 'unknown'
+from flask import Flask, jsonify
+
+app = Flask(__name__)
+
+def meta(path):
+    try:
+        token = subprocess.check_output(
+            [
+                "/usr/bin/curl", "-s", "-f", "-X", "PUT",
+                "http://169.254.169.254/latest/api/token",
+                "-H", "X-aws-ec2-metadata-token-ttl-seconds: 21600",
+            ],
+            timeout=2,
+            text=True,
+        ).strip()
+        return subprocess.check_output(
+            [
+                "/usr/bin/curl", "-s", "-f",
+                "-H", f"X-aws-ec2-metadata-token: {token}",
+                f"http://169.254.169.254/latest/meta-data/{path}",
+            ],
+            timeout=2,
+            text=True,
+        ).strip() or "unknown"
+    except Exception:
+        pass
+    try:
+        return subprocess.check_output(
+            ["/usr/bin/curl", "-s", "-f", f"http://169.254.169.254/latest/meta-data/{path}"],
+            timeout=2,
+            text=True,
+        ).strip() or "unknown"
+    except Exception:
+        return "unknown"
+
+INSTANCE_ID = meta("instance-id")
+AZ = meta("placement/availability-zone")
+REGION = os.environ.get("AWS_REGION") or (AZ[:-1] if AZ != "unknown" else "unknown")
+DB_HOST = os.environ.get("DB_HOST", "")
+DB_NAME = os.environ.get("DB_NAME", "appdb")
+APP_NAME = os.environ.get("APP_NAME", "Terraform App")
+
+def db_status():
+    if not DB_HOST:
+        return {"connected": False, "host": "", "error": "DB_HOST is empty"}
+    try:
+        secret_name = os.environ.get("DB_SECRET_NAME", "dev-db-credentials")
+        raw_secret = subprocess.check_output(
+            [
+                "/usr/bin/aws", "secretsmanager", "get-secret-value",
+                "--secret-id", secret_name,
+                "--query", "SecretString",
+                "--output", "text",
+                "--region", REGION,
+            ],
+            timeout=10,
+            text=True,
+        )
+        creds = json.loads(raw_secret)
+        import pymysql
+        conn = pymysql.connect(
+            host=DB_HOST,
+            user=creds["username"],
+            password=creds["password"],
+            database=DB_NAME,
+            connect_timeout=5,
+        )
+        conn.close()
+        return {"connected": True, "host": DB_HOST, "error": ""}
+    except Exception as exc:
+        return {"connected": False, "host": DB_HOST, "error": str(exc)}
+
 @app.route('/')
-def index(): return jsonify({'status':'running','instance':INSTANCE_ID})
+def index():
+    db = db_status()
+    return (
+        f"<h1>{APP_NAME}</h1>"
+        f"<p>Status: running</p>"
+        f"<p>Instance: {INSTANCE_ID}</p>"
+        f"<p>AZ: {AZ}</p>"
+        f"<p>DB: {'connected' if db['connected'] else 'not connected'}</p>"
+        f"<p>DB Host: {db['host']}</p>"
+    )
+
 @app.route('/health')
-def health(): return jsonify({'status':'healthy','instance':INSTANCE_ID}),200
-if __name__=="__main__": app.run(host='0.0.0.0',port=5000)
-FALLBACK
-        warn "Fallback app deployed (limited functionality)"
-    fi
+def health():
+    return jsonify({
+        "status": "healthy",
+        "instance": INSTANCE_ID,
+        "az": AZ,
+        "region": REGION,
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }), 200
+
+@app.route('/api/info')
+def info():
+    return jsonify({
+        "app": APP_NAME,
+        "instance": INSTANCE_ID,
+        "hostname": socket.gethostname(),
+        "az": AZ,
+        "region": REGION,
+        "db": db_status(),
+    })
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
+PYAPP
+    info "Flask application created"
+
+    # Fix ownership so www-data can run the app
+    chown -R www-data:www-data "${APP_DIR}"
 }
 
 # ---- Phase 3: Gunicorn Systemd Service ----
 setup_systemd() {
     info "Phase 3: Configuring Gunicorn systemd service..."
-    cat > /etc/systemd/system/app.service << 'SERVICEEOF'
+    local region
+    region="$(get_aws_region)"
+    local db_host
+    db_host="${DEFAULT_DB_HOST}"
+
+    cat > /etc/systemd/system/app.service << SERVICEEOF
 [Unit]
 Description=Terraform App (Gunicorn)
 After=network.target
@@ -114,8 +218,14 @@ Type=simple
 User=www-data
 Group=www-data
 WorkingDirectory=/opt/app
-Environment=PATH=/opt/app/venv/bin
-Environment=APP_NAME=Terraform App
+Environment=PATH=/opt/app/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=APP_NAME="${APP_NAME}"
+Environment=AWS_REGION="${region}"
+Environment=DB_HOST="${db_host}"
+Environment=DB_NAME="${DEFAULT_DB_NAME}"
+Environment=DB_SECRET_NAME="${DEFAULT_DB_SECRET_NAME}"
+Environment=PROJECT_NAME="${DEFAULT_PROJECT_NAME}"
+Environment=ENVIRONMENT="${DEFAULT_ENVIRONMENT}"
 ExecStart=/opt/app/venv/bin/gunicorn --workers 2 --bind 127.0.0.1:5000 app:app
 Restart=always
 RestartSec=5
@@ -161,8 +271,11 @@ setup_cloudwatch() {
     info "Phase 5: Installing CloudWatch Agent..."
     local cw_url="https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb"
     local cw_deb="/tmp/amazon-cloudwatch-agent.deb"
-    curl -s -o "${cw_deb}" "${cw_url}" 2>&1 | tee -a "${LOG_FILE}"
-    dpkg -i -E "${cw_deb}" 2>&1 | tee -a "${LOG_FILE}" || true
+    if curl -sf -o "${cw_deb}" "${cw_url}" 2>&1 | tee -a "${LOG_FILE}"; then
+        dpkg -i -E "${cw_deb}" 2>&1 | tee -a "${LOG_FILE}" || warn "CloudWatch Agent package install failed (non-fatal)"
+    else
+        warn "CloudWatch Agent download failed (non-fatal)"
+    fi
     mkdir -p "$(dirname "${CW_AGENT_CONFIG}")"
     cat > "${CW_AGENT_CONFIG}" << 'CWEOF'
 {

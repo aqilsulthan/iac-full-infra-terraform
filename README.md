@@ -40,7 +40,7 @@
 
 ```mermaid
 graph TB
-    subgraph AWS["☁️ AWS Cloud — ap-southeast-1"]
+    subgraph AWS["☁️ AWS Cloud — ap-southeast-3"]
         
         subgraph VPC["VPC (10.0.0.0/16)"]
             
@@ -248,7 +248,7 @@ iac-full-infra-terraform/
    aws configure
    # AWS Access Key ID: ************
    # AWS Secret Access Key: ************
-   # Default region: ap-southeast-1
+   # Default region: ap-southeast-3
    # Default output: json
    ```
 
@@ -260,8 +260,8 @@ Before first deployment, create the remote state backend:
 # Create S3 bucket
 aws s3api create-bucket \
     --bucket iac-portfolio-tfstate-aqilsulthan-2025 \
-    --region ap-southeast-1 \
-    --create-bucket-configuration LocationConstraint=ap-southeast-1
+    --region ap-southeast-3 \
+    --create-bucket-configuration LocationConstraint=ap-southeast-3
 
 # Enable versioning
 aws s3api put-bucket-versioning \
@@ -325,7 +325,7 @@ After deployment completes, find the ALB DNS name:
 
 ```bash
 echo $(terraform output -raw alb_dns_name)
-# → app-lb-123456789.ap-southeast-1.elb.amazonaws.com
+# → app-lb-123456789.ap-southeast-3.elb.amazonaws.com
 ```
 
 Then open in browser:
@@ -354,7 +354,7 @@ mysql -h $(terraform output -raw db_endpoint) -u appuser -p
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
 | `vpc_cidr` | `string` | — | CIDR block (e.g., `10.0.0.0/16`) |
-| `azs` | `list(string)` | — | Availability Zones (e.g., `["ap-southeast-1a", "ap-southeast-1b"]`) |
+| `azs` | `list(string)` | — | Availability Zones (e.g., `["ap-southeast-3a", "ap-southeast-3b"]`) |
 | `enable_nat_gateway` | `bool` | `true` | Whether to create NAT Gateway for private subnets |
 | `tags` | `map(string)` | `{}` | Common tags applied to all VPC resources |
 
@@ -562,7 +562,7 @@ All variables are defined in `environments/dev/variables.tf` and values can be o
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `aws_region` | `string` | `ap-southeast-1` | AWS region for deployment |
+| `aws_region` | `string` | `ap-southeast-3` | AWS region for deployment |
 | `environment` | `string` | `dev` | Environment name (for tagging) |
 | `project_name` | `string` | `iac-full-infra` | Project name (for tagging) |
 
@@ -571,7 +571,7 @@ All variables are defined in `environments/dev/variables.tf` and values can be o
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `vpc_cidr` | `string` | `10.0.0.0/16` | VPC CIDR block |
-| `azs` | `list(string)` | `["ap-southeast-1a", "ap-southeast-1b"]` | Availability Zones |
+| `azs` | `list(string)` | `["ap-southeast-3a", "ap-southeast-3b"]` | Availability Zones |
 
 ### Compute
 
@@ -628,16 +628,16 @@ All variables are defined in `environments/dev/variables.tf` and values can be o
 |--------|-------------|---------|
 | `vpc_id` | VPC ID | `vpc-0a1b2c3d4e5f67890` |
 | `public_subnet_ids` | Public subnet IDs | `["subnet-...", "subnet-..."]` |
-| `alb_dns_name` | ALB DNS (app URL) | `app-lb-123.ap-southeast-1.elb.amazonaws.com` |
+| `alb_dns_name` | ALB DNS (app URL) | `app-lb-123.ap-southeast-3.elb.amazonaws.com` |
 | `alb_target_group_arn` | ALB target group ARN | `arn:aws:elasticloadbalancing:...` |
 | `ec2_instance_ids` | EC2 instance IDs (if ASG disabled) | `["i-..."]` |
 | `ec2_private_ips` | EC2 private IPs (if ASG disabled) | `["10.0.0.10"]` |
 | `asg_name` | ASG name (if enabled) | `app-asg` |
-| `db_endpoint` | RDS endpoint | `app-db.xxx.ap-southeast-1.rds.amazonaws.com` |
+| `db_endpoint` | RDS endpoint | `app-db.xxx.ap-southeast-3.rds.amazonaws.com` |
 | `db_name` | Database name | `appdb` |
 | `iam_instance_profile` | IAM instance profile name | `app-instance-profile` |
 | `environment` | Environment name | `dev` |
-| `aws_region` | AWS region | `ap-southeast-1` |
+| `aws_region` | AWS region | `ap-southeast-3` |
 | `connect_commands` | Curl & MySQL command examples | `{ curl_app, mysql_cli }` |
 
 ---
