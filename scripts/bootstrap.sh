@@ -19,6 +19,7 @@ DEFAULT_DB_NAME="__DB_NAME__"
 DEFAULT_DB_SECRET_NAME="__DB_SECRET_NAME__"
 DEFAULT_PROJECT_NAME="__PROJECT_NAME__"
 DEFAULT_ENVIRONMENT="__ENVIRONMENT__"
+APP_SOURCE_URL="https://raw.githubusercontent.com/aqilsulthan/iac-full-infra-terraform/main/scripts/app.py"
 
 # ---- Logging Function ----
 log() {
@@ -79,8 +80,12 @@ setup_app() {
     source venv/bin/activate
     pip install --no-cache-dir flask gunicorn pymysql 2>&1 | tee -a "${LOG_FILE}"
 
-    info "Creating Flask application..."
-    cat > "${APP_DIR}/app.py" << 'PYAPP'
+    info "Downloading Flask application from GitHub..."
+    if curl -sfL -o "${APP_DIR}/app.py" "${APP_SOURCE_URL}" 2>&1 | tee -a "${LOG_FILE}"; then
+        info "Flask application downloaded from ${APP_SOURCE_URL}"
+    else
+        warn "GitHub download failed, creating fallback Flask application..."
+        cat > "${APP_DIR}/app.py" << 'PYAPP'
 import os
 import json
 import socket
@@ -194,7 +199,8 @@ def info():
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
 PYAPP
-    info "Flask application created"
+        info "Fallback Flask application created"
+    fi
 
     # Fix ownership so www-data can run the app
     chown -R www-data:www-data "${APP_DIR}"

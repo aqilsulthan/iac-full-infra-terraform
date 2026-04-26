@@ -1,7 +1,7 @@
 import os
-import sys
 import json
 import socket
+import shutil
 import subprocess
 from datetime import datetime
 from flask import Flask, jsonify, render_template_string
@@ -10,6 +10,29 @@ app = Flask(__name__)
 
 # EC2 Metadata (with fallbacks)
 def get_meta(path):
+    curl = shutil.which("curl") or "/usr/bin/curl"
+    try:
+        token = subprocess.check_output(
+            [
+                curl, "-s", "-f", "-X", "PUT",
+                "http://169.254.169.254/latest/api/token",
+                "-H", "X-aws-ec2-metadata-token-ttl-seconds: 21600",
+            ],
+            text=True,
+            timeout=2,
+        ).strip()
+        return subprocess.check_output(
+            [
+                curl, "-s", "-f",
+                "-H", f"X-aws-ec2-metadata-token: {token}",
+                f"http://169.254.169.254/latest/meta-data/{path}",
+            ],
+            text=True,
+            timeout=2,
+        ).strip() or "unknown"
+    except Exception:
+        pass
+
     try:
         import urllib.request
         req = urllib.request.Request(f"http://169.254.169.254/latest/meta-data/{path}", method="GET")
@@ -20,7 +43,7 @@ def get_meta(path):
 
 INSTANCE_ID   = get_meta("instance-id")
 AZ            = get_meta("placement/availability-zone")
-REGION        = AZ[:-1] if AZ != "unknown" else "unknown"
+REGION        = os.environ.get("AWS_REGION") or (AZ[:-1] if AZ != "unknown" else "unknown")
 INSTANCE_TYPE = get_meta("instance-type")
 PRIVATE_IP    = get_meta("local-ipv4")
 
@@ -39,10 +62,12 @@ def get_db_status():
     """Try reading DB credentials from Secrets Manager and connecting to RDS."""
     status = {"connected": False, "host": "", "error": "", "db_name": ""}
     try:
+        aws = shutil.which("aws") or "/usr/bin/aws"
+
         # Try to get the secret
         secret_name = os.environ.get("DB_SECRET_NAME", "dev-db-credentials")
         result = subprocess.run(
-            ["aws", "secretsmanager", "get-secret-value",
+            [aws, "secretsmanager", "get-secret-value",
              "--secret-id", secret_name,
              "--query", "SecretString",
              "--output", "text",
@@ -56,30 +81,33 @@ def get_db_status():
         creds = json.loads(result.stdout.strip())
         username = creds.get("username", "")
         password = creds.get("password", "")
-        
-        # Discover RDS endpoint via AWS CLI
-        project = os.environ.get("PROJECT_NAME", "iac-full-infra")
-        env = os.environ.get("ENVIRONMENT", "dev")
-        
-        rds_result = subprocess.run(
-            ["aws", "rds", "describe-db-instances",
-             "--region", REGION,
-             "--query", (
-                 'DBInstances[?contains(Tags[?Key==`Project`].Value,`{}`) '
-                 '&& contains(Tags[?Key==`Environment`].Value,`{}`)]'
-                 ' | [0].Endpoint.Address'
-             ).format(project, env),
-             "--output", "text"],
-            capture_output=True, text=True, timeout=10
-        )
-        
-        if rds_result.returncode != 0 or not rds_result.stdout.strip() or rds_result.stdout.strip() == "None":
-            status["error"] = "RDS endpoint not found via tags"
-            return status
-        
-        db_host = rds_result.stdout.strip()
+        db_host = os.environ.get("DB_HOST", "")
+
+        if not db_host:
+            # Fallback discovery via AWS CLI if Terraform did not inject DB_HOST.
+            project = os.environ.get("PROJECT_NAME", "iac-full-infra")
+            env = os.environ.get("ENVIRONMENT", "dev")
+
+            rds_result = subprocess.run(
+                [aws, "rds", "describe-db-instances",
+                 "--region", REGION,
+                 "--query", (
+                     'DBInstances[?contains(Tags[?Key==`Project`].Value,`{}`) '
+                     '&& contains(Tags[?Key==`Environment`].Value,`{}`)]'
+                     ' | [0].Endpoint.Address'
+                 ).format(project, env),
+                 "--output", "text"],
+                capture_output=True, text=True, timeout=10
+            )
+
+            if rds_result.returncode != 0 or not rds_result.stdout.strip() or rds_result.stdout.strip() == "None":
+                status["error"] = "RDS endpoint not found"
+                return status
+
+            db_host = rds_result.stdout.strip()
+
         status["host"] = db_host
-        status["db_name"] = creds.get("db_name", "appdb")
+        status["db_name"] = os.environ.get("DB_NAME") or creds.get("db_name", "appdb")
         
         # Try MySQL connection
         try:
