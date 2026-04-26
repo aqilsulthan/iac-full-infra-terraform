@@ -1,10 +1,41 @@
-.terraform/
+# Terraform local files
+**/.terraform/
 *.tfstate
 *.tfstate.*
-*.log
-.env
-github-oidc-trust.json
-**/tfplan
 *.tfplan
+**/tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# Local variable and secret files
+*.tfvars
+*.tfvars.json
+!.tfvars.example
+.env
+.env.*
+
+# Logs and generated files
+*.log
+*.tmp
+*.bak
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node/local tooling artifacts
+node_modules/
 package.json
 package-lock.json
+
+# Local docs / presentation notes
+script.md
+
+# Local AWS/OIDC helper files
+github-oidc-trust.json

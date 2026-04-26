@@ -277,16 +277,3 @@ cd C:\iac-full-infra-terraform\environments\dev
 terraform destroy -var-file="terraform.tfvars"
 ```
 
-More detailed presentation and cleanup commands are available in [script.md](script.md).
-
-## Portfolio Talking Points
-
-Use this project to explain:
-
-- Why the Terraform code is modular.
-- How ALB health checks protect traffic flow.
-- How ASG rolling refresh updates instances safely.
-- Why RDS is placed privately.
-- How EC2 retrieves DB credentials through IAM and Secrets Manager.
-- How bootstrap converts a plain Ubuntu instance into a working application server.
-- How to validate infrastructure using Terraform outputs, AWS CLI, and app endpoints.
