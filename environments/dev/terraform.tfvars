@@ -51,11 +51,6 @@ db_username = "appuser"
 # ---- Secrets Manager ----
 db_secret_name = "dev-db-credentials"
 
-# ---- S3 Backend ----
-state_bucket         = "iac-tfstate-407772390483"
-state_key            = "dev/terraform.tfstate"
-state_dynamodb_table = "terraform-locks"
-
 # ---- Tags ----
 environment  = "dev"
 project_name = "iac-full-infra"

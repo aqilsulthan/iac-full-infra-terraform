@@ -149,25 +149,6 @@ variable "db_secret_name" {
   default     = "dev-db-credentials"
 }
 
-# ---- S3 Backend ----
-variable "state_bucket" {
-  description = "Nama S3 bucket untuk Terraform state"
-  type        = string
-  default     = "iac-portfolio-tfstate-aqilsulthan-2025"
-}
-
-variable "state_key" {
-  description = "Path key untuk state file di S3"
-  type        = string
-  default     = "dev/terraform.tfstate"
-}
-
-variable "state_dynamodb_table" {
-  description = "Nama DynamoDB table untuk state locking"
-  type        = string
-  default     = "terraform-locks"
-}
-
 # ---- Tags ----
 variable "environment" {
   description = "Nama environment untuk tagging"
