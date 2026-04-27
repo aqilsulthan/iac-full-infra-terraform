@@ -82,7 +82,8 @@ ALB -> ASG/EC2 -> Nginx -> Gunicorn -> Flask -> Secrets Manager -> RDS
 |   `-- vpc/
 |-- scripts/
 |   |-- app.py
-|   `-- bootstrap.sh
+|   |-- bootstrap.sh
+|   `-- setup-backend.sh
 |-- .github/
 |   `-- workflows/
 |       |-- terraform-plan.yml
@@ -126,7 +127,7 @@ The app exposes:
 
 ## Prerequisites
 
-- Terraform `>= 1.5`
+- Terraform `>= 1.10` recommended for the S3 backend `use_lockfile` setting; GitHub Actions currently uses Terraform `1.11.4`
 - AWS CLI
 - AWS credentials configured locally
 - An AWS account with permissions to create VPC, EC2, ALB, ASG, RDS, IAM, Secrets Manager, and CloudWatch resources
@@ -137,10 +138,33 @@ Check authentication:
 aws sts get-caller-identity
 ```
 
+## Remote State Backend
+
+The dev environment is configured to store Terraform state in S3:
+
+```hcl
+bucket       = "iac-tfstate-407772390483"
+key          = "dev/terraform.tfstate"
+region       = "ap-southeast-3"
+use_lockfile = true
+encrypt      = true
+```
+
+Create the backend resources once before the first `terraform init`:
+
+```bash
+chmod +x scripts/setup-backend.sh
+./scripts/setup-backend.sh
+```
+
+The script creates the S3 state bucket with versioning, encryption, and public access blocked. It also creates a DynamoDB lock table for compatibility, although the active backend configuration currently uses Terraform's native S3 lockfile setting.
+
 ## Quick Start
 
 ```powershell
 cd C:\iac-full-infra-terraform\environments\dev
+
+$env:TF_VAR_db_password = "replace-with-a-strong-password"
 
 terraform init
 terraform fmt -check -recursive ..\..
@@ -185,13 +209,22 @@ enable_asg           = true
 asg_desired_capacity = 2
 asg_min_size         = 2
 asg_max_size         = 4
+asg_app_name         = "app"
+
+scale_out_adjustment        = 1
+scale_out_cooldown          = 60
+cpu_high_threshold          = 70
+cpu_high_evaluation_periods = 2
+cpu_high_period             = 60
 
 app_ingress_cidr_blocks = ["YOUR_PUBLIC_IP/32"]
 
 db_name        = "appdb"
 db_username    = "appuser"
-db_password    = "change-me"
 db_secret_name = "dev-db-credentials"
+
+environment  = "dev"
+project_name = "iac-full-infra"
 ```
 
 For a public repository, do not commit real secrets. Prefer:
@@ -199,6 +232,12 @@ For a public repository, do not commit real secrets. Prefer:
 - `terraform.tfvars.example` for sample values
 - `.gitignore` for real `terraform.tfvars`
 - AWS Secrets Manager, SSM Parameter Store, or CI/CD secrets for sensitive values
+
+For local runs, provide the DB password through an environment variable instead of committing it:
+
+```powershell
+$env:TF_VAR_db_password = "replace-with-a-strong-password"
+```
 
 ## Operational Validation
 
@@ -242,7 +281,24 @@ GitHub Actions workflows are included:
 - `.github/workflows/terraform-plan.yml`
 - `.github/workflows/terraform-apply.yml`
 
-They are designed for AWS OIDC authentication. Before using them in another AWS account or GitHub repository, update:
+They are designed for AWS OIDC authentication and run Terraform against `environments/dev`.
+
+Required GitHub configuration:
+
+| Type | Name | Purpose |
+| --- | --- | --- |
+| Secret | `AWS_ROLE_TO_ASSUME` | IAM role assumed through GitHub OIDC |
+| Secret | `DB_PASSWORD` | Injected as `TF_VAR_db_password` |
+| Variable | `APP_INGRESS_CIDR_BLOCKS` | Injected as `TF_VAR_app_ingress_cidr_blocks` |
+
+Workflow behavior:
+
+| Workflow | Trigger | Notes |
+| --- | --- | --- |
+| `Terraform Plan` | Pull requests that touch Terraform/workflow files, or manual dispatch | Runs fmt, init, validate, plan, and comments on PRs |
+| `Terraform Apply` | Manual dispatch | Runs only on `refs/heads/master` and targets the `dev` environment |
+
+Before using these workflows in another AWS account or GitHub repository, update:
 
 - `role-to-assume`
 - AWS region if needed
@@ -276,4 +332,3 @@ Destroy resources after demos if you do not need them running.
 cd C:\iac-full-infra-terraform\environments\dev
 terraform destroy -var-file="terraform.tfvars"
 ```
-
