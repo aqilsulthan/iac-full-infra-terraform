@@ -35,7 +35,6 @@ cpu_high_period             = 60
 # lalu tulis: "<IP_KAMU>/32"
 # Contoh: app_ingress_cidr_blocks = ["123.123.123.123/32"]
 # ═══════════════════════════════════════════════════════
-# ⚠️  Saat ini: 0.0.0.0/0 = TERBUKA UNTUK SEMUA
 #    Ganti sebelum staging/prod!
 app_ingress_cidr_blocks = ["36.71.225.181/32"] # my ip
 app_sg_name             = "app-sg"
