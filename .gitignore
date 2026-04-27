@@ -10,7 +10,6 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-.terraform.lock.hcl
 
 # Local variable and secret files
 *.tfvars
@@ -35,8 +34,7 @@ node_modules/
 package.json
 package-lock.json
 
-# Local docs / presentation notes
-script.md
-
 # Local AWS/OIDC helper files
 github-oidc-trust.json
+
+script.md
