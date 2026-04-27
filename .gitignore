@@ -16,6 +16,7 @@ override.tf.json
 *.tfvars
 *.tfvars.json
 !.tfvars.example
+!environments/dev/terraform.tfvars
 .env
 .env.*
 
