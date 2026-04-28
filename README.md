@@ -324,9 +324,9 @@ This project can create billable AWS resources:
 - CloudWatch logs/metrics
 - Secrets Manager
 
-Destroy resources after demos if you do not need them running.
-
 ## Cleanup
+
+You can destroy all resources if you do not need them running.
 
 ```powershell
 cd C:\iac-full-infra-terraform\environments\dev
