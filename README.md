@@ -55,12 +55,70 @@ ALB -> ASG/EC2 -> Nginx -> Gunicorn -> Flask -> Secrets Manager -> RDS
 | --- | --- | --- |
 | Network | VPC, public/private subnets, IGW, optional NAT | Isolated network foundation |
 | Entry point | Application Load Balancer | Public HTTP access and health checks |
-| Compute | Auto Scaling Group, Launch Template, EC2 | Highly available app instances |
-| App runtime | Nginx, Gunicorn, Flask | Web application stack |
+| Compute | Auto Scaling Group, Launch Template, EC2 / Docker | Highly available app instances |
+| App runtime | Gunicorn, Flask (containerized) | Web application stack |
 | Data | RDS MySQL | Private relational database |
 | Secrets | AWS Secrets Manager | Database credential storage |
 | Identity | IAM role and instance profile | EC2 permissions for AWS APIs |
 | Observability | CloudWatch Agent, logs, metrics, alarm | Basic monitoring and scale-out |
+
+## Docker Support
+
+The application has been containerized with Docker. This is the first step toward Kubernetes (EKS) migration while keeping the existing Terraform infrastructure intact.
+
+### Project Files for Docker
+
+| File | Purpose |
+| --- | --- |
+| `Dockerfile` | Multi-stage build: installs dependencies (builder stage) then runs the Flask app with Gunicorn (runtime stage) |
+| `.dockerignore` | Excludes Terraform configs, git files, Python cache from the Docker build context |
+| `requirements.txt` | Python dependencies (flask, gunicorn, pymysql) |
+| `docker-compose.yml` | Local development with environment variable support |
+
+### Build & Run Locally
+
+```bash
+# Build the image
+docker build -t iac-full-infra-app:latest .
+
+# Run with docker-compose (recommended for local testing)
+docker-compose up --build
+
+# Or run directly with Docker
+docker run -d \
+  --name iac-full-infra-app \
+  -p 5000:5000 \
+  -e AWS_REGION=ap-southeast-3 \
+  -e DB_HOST=your-rds-endpoint \
+  -e DB_SECRET_NAME=dev-db-credentials \
+  -e AWS_ACCESS_KEY_ID=your-key \
+  -e AWS_SECRET_ACCESS_KEY=your-secret \
+  iac-full-infra-app:latest
+
+# Test the container
+curl http://localhost:5000/health
+curl http://localhost:5000/api/info
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `APP_NAME` | `iac-full-infra` | Application name displayed on dashboard |
+| `AWS_REGION` | `ap-southeast-3` | AWS region |
+| `DB_HOST` | *(empty)* | RDS endpoint (must be set for DB connection) |
+| `DB_NAME` | `appdb` | Database name |
+| `DB_SECRET_NAME` | `dev-db-credentials` | Secrets Manager secret name |
+| `ENVIRONMENT` | `dev` | Deployment environment |
+| `PROJECT_NAME` | `iac-full-infra` | Project name for resource tagging |
+
+### What Changed When Containerizing
+
+- **app.py** now auto-detects if running inside a container (`/.dockerenv` or cgroup check)
+- Container-specific startup info is shown on the dashboard instead of EC2 bootstrap logs
+- **Nginx is removed** — Gunicorn binds directly to `0.0.0.0:5000` (load balancing is handled by the ALB/Kubernetes Ingress in production)
+- **CloudWatch Agent is removed** — container logs go to stdout/stderr (captured by Docker/Kubernetes logging)
+- **Systemd service is removed** — Gunicorn is the container entrypoint (managed by Docker/Kubernetes)
 
 ## Repository Structure
 

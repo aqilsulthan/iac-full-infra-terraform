@@ -1,0 +1,51 @@
+# ============================================================
+# Docker Compose — Terraform IaC Flask Application
+#
+# Usage:
+#   docker-compose up --build         # Build & run locally
+#   docker-compose up -d              # Run in background
+#   docker-compose down               # Stop & remove containers
+#
+# For production, use environment variables or .env file:
+#   DB_HOST, DB_NAME, DB_SECRET_NAME, AWS_REGION, etc.
+# ============================================================
+
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iac-full-infra-app
+    ports:
+      - "5000:5000"
+    environment:
+      # === App Configuration ===
+      - APP_NAME=${APP_NAME:-iac-full-infra}
+      - ENVIRONMENT=${ENVIRONMENT:-dev}
+      - PROJECT_NAME=${PROJECT_NAME:-iac-full-infra}
+
+      # === AWS Configuration ===
+      - AWS_REGION=${AWS_REGION:-ap-southeast-3}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-southeast-3}
+
+      # === Database Configuration ===
+      - DB_HOST=${DB_HOST:-}
+      - DB_NAME=${DB_NAME:-appdb}
+      - DB_SECRET_NAME=${DB_SECRET_NAME:-dev-db-credentials}
+
+      # === AWS Credentials (Mount from host or pass via .env) ===
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN:-}
+    volumes:
+      # Mount AWS credentials from host for Secrets Manager access
+      - ~/.aws:/home/appuser/.aws:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

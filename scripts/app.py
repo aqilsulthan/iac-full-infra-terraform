@@ -8,7 +8,29 @@ from flask import Flask, jsonify, render_template_string
 
 app = Flask(__name__)
 
-# EC2 Metadata (with fallbacks)
+# ---- Environment Detection ----
+def is_running_in_container():
+    """Detect if we are running inside a Docker container."""
+    if os.path.exists("/.dockerenv"):
+        return True
+    try:
+        with open("/proc/1/cgroup") as f:
+            return "docker" in f.read() or "kubepods" in f.read()
+    except Exception:
+        return False
+
+IN_CONTAINER = is_running_in_container()
+
+# ---- Container Info ----
+def get_container_id():
+    """Get container ID from hostname or cgroup."""
+    hostname = socket.gethostname()
+    # Docker container IDs are usually 12-char hex strings
+    if len(hostname) == 12 and all(c in "0123456789abcdef" for c in hostname):
+        return hostname
+    return hostname
+
+# ---- EC2 Metadata (with fallbacks) ----
 def get_meta(path):
     curl = shutil.which("curl") or "/usr/bin/curl"
     try:
@@ -47,16 +69,40 @@ REGION        = os.environ.get("AWS_REGION") or (AZ[:-1] if AZ != "unknown" else
 INSTANCE_TYPE = get_meta("instance-type")
 PRIVATE_IP    = get_meta("local-ipv4")
 
-# Bootstrap log parser (show last lines on the page)
+# ---- Bootstrap / Startup Logs ----
 def get_bootstrap_logs(lines=20):
+    """Read bootstrap logs (EC2) or container startup info."""
+    log_path = "/var/log/app-bootstrap.log"
+    if IN_CONTAINER:
+        return get_container_startup_info()
     try:
         result = subprocess.run(
-            ["tail", "-" + str(lines), "/var/log/app-bootstrap.log"],
+            ["tail", "-" + str(lines), log_path],
             capture_output=True, text=True, timeout=5
         )
         return result.stdout if result.returncode == 0 else "Log unavailable"
     except Exception:
         return "Log unavailable"
+
+def get_container_startup_info():
+    """Show container-relevant startup information."""
+    info_lines = []
+    info_lines.append(f"Container ID : {get_container_id()}")
+    info_lines.append(f"Hostname     : {socket.gethostname()}")
+    info_lines.append(f"Platform     : Docker / Container")
+    info_lines.append(f"Python       : {os.sys.version.split()[0]}")
+    info_lines.append(f"App started  : {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    info_lines.append(f"Environment  : {os.environ.get('ENVIRONMENT', 'N/A')}")
+    info_lines.append(f"Project      : {os.environ.get('PROJECT_NAME', 'N/A')}")
+    info_lines.append("---")
+    # Try to show env vars relevant to this app
+    for key in sorted(os.environ.keys()):
+        if key.startswith(("APP_", "DB_", "AWS_", "PROJECT_", "ENVIRONMENT")):
+            val = os.environ[key]
+            if "SECRET" in key or "PASSWORD" in key or "PASS" in key:
+                val = "****"
+            info_lines.append(f"{key}={val}")
+    return "\n".join(info_lines)
 
 def get_db_status():
     """Try reading DB credentials from Secrets Manager and connecting to RDS."""

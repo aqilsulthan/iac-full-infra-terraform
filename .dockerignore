@@ -1,0 +1,37 @@
+# === Git ===
+.git
+.gitignore
+.github
+
+# === Terraform ===
+environments
+modules
+*.tf
+*.tfvars
+*.tfstate
+*.tfstate.backup
+
+# === Python ===
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+*.egg
+.venv
+venv
+env
+
+# === IDE & OS ===
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# === Project-specific ===
+scripts/bootstrap.sh
+scripts/setup-backend.sh
+README.md
+script.md
