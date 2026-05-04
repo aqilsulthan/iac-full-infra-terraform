@@ -4,7 +4,7 @@ Infrastructure as Code portfolio project that provisions a full AWS application 
 
 ## What This Project Deploys
 
-The project supports **two deployment modes**: the original EC2/ASG mode and the new Kubernetes/EKS mode:
+The project supports **two deployment modes**, the original EC2/ASG mode and the new Kubernetes/EKS mode:
 
 ### Mode 1: EC2/ASG (Classic)
 
