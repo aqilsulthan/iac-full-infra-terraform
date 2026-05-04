@@ -70,14 +70,14 @@ ALB -> ASG/EC2 -> Nginx -> Gunicorn -> Flask -> Secrets Manager -> RDS
 
 | Layer | AWS resource | Purpose |
 | --- | --- | --- |
-| Network | VPC, public/private subnets, IGW, optional NAT | Isolated network foundation |
+| Network | VPC, public/private subnets, IGW | Isolated network foundation (subnets tagged for ALB auto-discovery) |
 | Entry point | Application Load Balancer | Public HTTP access and health checks |
-| Compute | Auto Scaling Group, Launch Template, EC2 / Docker | Highly available app instances |
+| Compute | Auto Scaling Group / EKS Node Group | Highly available app instances |
 | App runtime | Gunicorn, Flask (containerized) | Web application stack |
 | Data | RDS MySQL | Private relational database |
 | Secrets | AWS Secrets Manager | Database credential storage |
-| Identity | IAM role and instance profile | EC2 permissions for AWS APIs |
-| Observability | CloudWatch Agent, logs, metrics, alarm | Basic monitoring and scale-out |
+| Identity | IAM role and instance profile / IRSA | Permissions for AWS APIs |
+| Observability | CloudWatch Agent, EKS logs | Basic monitoring and scale-out |
 
 ## Docker Support
 
@@ -603,18 +603,27 @@ Before using these workflows in another AWS account or GitHub repository, update
 
 This project can create billable AWS resources:
 
+- EKS Control Plane ($0.10/hour)
 - ALB
-- EC2 instances
+- EC2 instances / EKS Worker Nodes
 - RDS instance
 - NAT Gateway if enabled
 - CloudWatch logs/metrics
 - Secrets Manager
+- ECR Storage
 
 ## Cleanup
 
-You can destroy all resources if you do not need them running.
+> [!WARNING]
+> **If you deployed to EKS**, you MUST delete the Kubernetes Ingress before running `terraform destroy`. The AWS Load Balancer Controller creates an ALB outside of Terraform's state. If you don't delete the ingress first, Terraform will fail to destroy the VPC because the ALB is still using the subnets.
 
 ```powershell
+# If using EKS: Delete ingress first!
+kubectl delete ingress app -n app
+
+# Destroy all Terraform resources
 cd C:\iac-full-infra-terraform\environments\dev
 terraform destroy -var-file="terraform.tfvars"
 ```
+
+*Note: The ECR module is configured with `force_delete = true`, so Terraform will automatically delete any Docker images remaining in the repository during destroy.*
