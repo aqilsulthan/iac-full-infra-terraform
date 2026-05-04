@@ -4,7 +4,7 @@ Infrastructure as Code portfolio project that provisions a full AWS application 
 
 ## What This Project Deploys
 
-The project supports **two deployment modes** — the original EC2/ASG mode and the new Kubernetes/EKS mode:
+The project supports **two deployment modes**: the original EC2/ASG mode and the new Kubernetes/EKS mode:
 
 ### Mode 1: EC2/ASG (Classic)
 
@@ -132,10 +132,10 @@ curl http://localhost:5000/api/info
 
 - **app.py** now auto-detects if running inside a container (`/.dockerenv` or cgroup check)
 - Container-specific startup info is shown on the dashboard instead of EC2 bootstrap logs
-- **Nginx is removed** — Gunicorn binds directly to `0.0.0.0:5000` (load balancing is handled by the ALB/Kubernetes Ingress in production)
-- **CloudWatch Agent is removed** — container logs go to stdout/stderr (captured by Docker/Kubernetes logging)
-- **Systemd service is removed** — Gunicorn is the container entrypoint (managed by Docker/Kubernetes)
-- **Security & AWS Credentials** — Container runs as a non-root `appuser`. Local AWS credentials can be safely mounted to `/home/appuser/.aws` to authenticate via `boto3` without installing `awscli`.
+- **Nginx is removed**: Gunicorn binds directly to `0.0.0.0:5000` (load balancing is handled by the ALB/Kubernetes Ingress in production)
+- **CloudWatch Agent is removed**: container logs go to stdout/stderr (captured by Docker/Kubernetes logging)
+- **Systemd service is removed**: Gunicorn is the container entrypoint (managed by Docker/Kubernetes)
+- **Security & AWS Credentials**: Container runs as a non-root `appuser`. Local AWS credentials can be safely mounted to `/home/appuser/.aws` to authenticate via `boto3` without installing `awscli`.
 
 ## ECR (Elastic Container Registry)
 
