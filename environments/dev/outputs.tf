@@ -52,8 +52,79 @@ output "db_name" {
   value       = var.db_name
 }
 
+# ---- ECR ----
+output "ecr_repository_url" {
+  description = "URL ECR repository untuk push/pull Docker image"
+  value       = module.ecr.repository_url
+}
+
+output "ecr_repository_arn" {
+  description = "ARN ECR repository"
+  value       = module.ecr.repository_arn
+}
+
+output "ecr_repository_name" {
+  description = "Nama ECR repository"
+  value       = module.ecr.repository_name
+}
+
+# ---- EKS (Kubernetes) ----
+output "eks_cluster_name" {
+  description = "Nama EKS cluster"
+  value       = module.eks.cluster_name
+}
+
+output "eks_cluster_endpoint" {
+  description = "Endpoint API server EKS cluster"
+  value       = module.eks.cluster_endpoint
+}
+
+output "eks_cluster_version" {
+  description = "Versi Kubernetes yang berjalan di EKS"
+  value       = module.eks.cluster_version
+}
+
+output "eks_node_security_group_id" {
+  description = "ID security group untuk node group EKS"
+  value       = module.eks.node_security_group_id
+}
+
+output "eks_node_group_id" {
+  description = "ID node group EKS"
+  value       = module.eks.node_group_id
+}
+
+output "eks_oidc_provider_arn" {
+  description = "ARN OIDC provider untuk IRSA di EKS"
+  value       = module.eks.oidc_provider_arn
+}
+
+output "eks_oidc_provider_url" {
+  description = "URL OIDC provider EKS"
+  value       = module.eks.oidc_provider_url
+}
+
+output "eks_alb_controller_iam_role_arn" {
+  description = "ARN IAM role untuk AWS Load Balancer Controller (IRSA)"
+  value       = module.eks.alb_controller_iam_role_arn
+}
+
+# ---- Command Reference ----
+output "connect_commands" {
+  description = "Perintah untuk mengakses resource"
+  sensitive   = true
+  value = {
+    curl_app              = "curl http://${module.alb.dns_name}"
+    mysql_cli             = "mysql -h ${module.db.endpoint} -u ${var.db_username} -p"
+    eks_update_kubeconfig = "aws eks update-kubeconfig --name ${module.eks.cluster_name} --region ${var.aws_region}"
+    kubectl_get_nodes     = "kubectl get nodes"
+    kubectl_get_pods      = "kubectl get pods -n app"
+  }
+}
+
 # ---- IAM ----
 output "iam_instance_profile" {
+
   description = "Nama instance profile IAM yang terattach ke EC2/ASG"
   value       = module.iam.instance_profile
 }
@@ -67,14 +138,4 @@ output "environment" {
 output "aws_region" {
   description = "Region tempat resource dideploy"
   value       = var.aws_region
-}
-
-# ---- Command Reference ----
-output "connect_commands" {
-  description = "Perintah untuk mengakses resource"
-  sensitive   = true
-  value = {
-    curl_app  = "curl http://${module.alb.dns_name}"
-    mysql_cli = "mysql -h ${module.db.endpoint} -u ${var.db_username} -p"
-  }
 }

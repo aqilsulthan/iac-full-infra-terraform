@@ -149,8 +149,71 @@ variable "db_secret_name" {
   default     = "dev-db-credentials"
 }
 
+# ---- ECR ----
+variable "ecr_repository_name" {
+  description = "Nama ECR repository untuk menyimpan Docker image"
+  type        = string
+  default     = "iac-full-infra-app"
+}
+
+# ---- EKS (Kubernetes) ----
+variable "eks_cluster_name" {
+  description = "Nama EKS cluster"
+  type        = string
+  default     = "iac-full-infra-eks"
+}
+
+variable "eks_cluster_version" {
+  description = "Versi Kubernetes untuk EKS cluster"
+  type        = string
+  default     = "1.30"
+}
+
+variable "eks_cluster_endpoint_private_access" {
+  description = "Aktifkan akses private ke EKS API endpoint"
+  type        = bool
+  default     = false
+}
+
+variable "eks_cluster_endpoint_public_access" {
+  description = "Aktifkan akses public ke EKS API endpoint"
+  type        = bool
+  default     = true
+}
+
+variable "eks_node_group_instance_types" {
+  description = "Instance types untuk EKS node group"
+  type        = list(string)
+  default     = ["t3.micro"]
+}
+
+variable "eks_node_group_desired_size" {
+  description = "Jumlah node yang diinginkan"
+  type        = number
+  default     = 2
+}
+
+variable "eks_node_group_min_size" {
+  description = "Jumlah minimum node"
+  type        = number
+  default     = 1
+}
+
+variable "eks_node_group_max_size" {
+  description = "Jumlah maksimum node"
+  type        = number
+  default     = 4
+}
+
+variable "eks_node_group_disk_size" {
+  description = "Ukuran disk dalam GB untuk node group"
+  type        = number
+  default     = 20
+}
+
 # ---- Tags ----
 variable "environment" {
+
   description = "Nama environment untuk tagging"
   type        = string
   default     = "dev"

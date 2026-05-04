@@ -18,8 +18,9 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = merge(var.tags, {
-    Name = "public-subnet-${count.index}"
-    Tier = "public"
+    Name                     = "public-subnet-${count.index}"
+    Tier                     = "public"
+    "kubernetes.io/role/elb" = "1"
   })
 }
 
@@ -32,8 +33,9 @@ resource "aws_subnet" "private" {
   map_public_ip_on_launch = false
 
   tags = merge(var.tags, {
-    Name = "private-subnet-${count.index}"
-    Tier = "private"
+    Name                              = "private-subnet-${count.index}"
+    Tier                              = "private"
+    "kubernetes.io/role/internal-elb" = "1"
   })
 }
 

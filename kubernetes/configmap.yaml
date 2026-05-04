@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: app
+  labels:
+    app: iac-full-infra
+    environment: dev
+data:
+  APP_NAME: "iac-full-infra"
+  AWS_REGION: "ap-southeast-3"
+  DB_NAME: "appdb"
+  DB_SECRET_NAME: "dev-db-credentials"
+  ENVIRONMENT: "dev"
+  PROJECT_NAME: "iac-full-infra"

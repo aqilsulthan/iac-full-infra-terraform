@@ -50,6 +50,17 @@ db_username = "appuser"
 # ---- Secrets Manager ----
 db_secret_name = "dev-db-credentials"
 
+# ---- EKS (Kubernetes) ----
+eks_cluster_name                    = "iac-full-infra-eks"
+eks_cluster_version                 = "1.30"
+eks_cluster_endpoint_private_access = false
+eks_cluster_endpoint_public_access  = true
+eks_node_group_instance_types       = ["t3.micro"]
+eks_node_group_desired_size         = 3
+eks_node_group_min_size             = 2
+eks_node_group_max_size             = 5
+eks_node_group_disk_size            = 20
+
 # ---- Tags ----
 environment  = "dev"
 project_name = "iac-full-infra"

@@ -124,7 +124,7 @@ resource "aws_security_group" "db_sg" {
     from_port       = 3306
     to_port         = 3306
     protocol        = "tcp"
-    security_groups = [aws_security_group.app_sg.id]
+    security_groups = [aws_security_group.app_sg.id, module.eks.node_security_group_id]
   }
 
   egress {
@@ -173,7 +173,39 @@ module "iam" {
   tags   = local.common_tags
 }
 
+# ---- ECR Repository (untuk Docker image) ----
+module "ecr" {
+  source          = "../../modules/ecr"
+  repository_name = var.ecr_repository_name
+  tags            = local.common_tags
+}
+
+# ---- EKS Cluster (Kubernetes) ----
+module "eks" {
+  source = "../../modules/eks"
+
+  cluster_name    = var.eks_cluster_name
+  cluster_version = var.eks_cluster_version
+  vpc_id          = module.vpc.vpc_id
+  subnet_ids      = module.vpc.public_subnet_ids
+  vpc_cidr        = var.vpc_cidr
+
+  cluster_endpoint_private_access = var.eks_cluster_endpoint_private_access
+  cluster_endpoint_public_access  = var.eks_cluster_endpoint_public_access
+
+  node_group_instance_types = var.eks_node_group_instance_types
+  node_group_desired_size   = var.eks_node_group_desired_size
+  node_group_min_size       = var.eks_node_group_min_size
+  node_group_max_size       = var.eks_node_group_max_size
+  node_group_disk_size      = var.eks_node_group_disk_size
+
+  tags = local.common_tags
+
+  depends_on = [module.vpc]
+}
+
 module "asg" {
+
   count = var.enable_asg ? 1 : 0
 
   source = "../../modules/asg"
