@@ -27,8 +27,8 @@ services:
       - PROJECT_NAME=${PROJECT_NAME:-iac-full-infra}
 
       # === AWS Configuration ===
-      - AWS_REGION=${AWS_REGION:-ap-southeast-3}
-      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-southeast-3}
+      - AWS_REGION=${AWS_REGION:-ap-southeast-1}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-southeast-1}
 
       # === Database Configuration ===
       - DB_HOST=${DB_HOST:-}

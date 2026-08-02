@@ -20,7 +20,7 @@ spec:
       serviceAccountName: app
       containers:
         - name: app
-          image: 407772390483.dkr.ecr.ap-southeast-3.amazonaws.com/iac-full-infra-app:latest
+          image: 407772390483.dkr.ecr.ap-southeast-1.amazonaws.com/iac-full-infra-app:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 5000

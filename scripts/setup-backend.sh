@@ -14,7 +14,7 @@ set -euo pipefail
 
 BUCKET_NAME="iac-tfstate-407772390483"
 DYNAMO_TABLE="terraform-locks"
-REGION="ap-southeast-3"
+REGION="ap-southeast-1"
 
 echo "🪣 Creating S3 bucket: ${BUCKET_NAME} ..."
 if aws s3api head-bucket --bucket "${BUCKET_NAME}" 2>/dev/null; then

@@ -3,11 +3,11 @@
 # ============================================================
 
 # ---- AWS Provider ----
-aws_region = "ap-southeast-3"
+aws_region = "ap-southeast-1"
 
 # ---- VPC ----
 vpc_cidr           = "10.0.0.0/16"
-azs                = ["ap-southeast-3a", "ap-southeast-3b"]
+azs                = ["ap-southeast-1a", "ap-southeast-1b"]
 enable_nat_gateway = false
 
 # ---- EC2 / Compute ----

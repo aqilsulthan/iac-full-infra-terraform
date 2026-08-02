@@ -8,7 +8,7 @@ metadata:
     environment: dev
 data:
   APP_NAME: "iac-full-infra"
-  AWS_REGION: "ap-southeast-3"
+  AWS_REGION: "ap-southeast-1"
   DB_NAME: "appdb"
   DB_SECRET_NAME: "dev-db-credentials"
   ENVIRONMENT: "dev"

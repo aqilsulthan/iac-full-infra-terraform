@@ -34,7 +34,7 @@ User
 
 Default deployment target:
 
-- Region: `ap-southeast-3`
+- Region: `ap-southeast-1`
 - Environment: `dev`
 - Compute (EC2/ASG): ASG with `t3.micro`, desired `2`, min `2`, max `4`
 - Compute (EKS): Node group with `t3.medium`, desired `2`, min `1`, max `4`
@@ -49,14 +49,14 @@ The deployed application has been validated through the ALB:
 ```json
 {
   "app": "iac-full-infra",
-  "az": "ap-southeast-3a",
+  "az": "ap-southeast-1a",
   "db": {
     "connected": true,
     "error": "",
-    "host": "app-db.cjwc6uy8qcqm.ap-southeast-3.rds.amazonaws.com"
+    "host": "app-db.cjwc6uy8qcqm.ap-southeast-1.rds.amazonaws.com"
   },
   "instance": "i-0cff5741779a59779",
-  "region": "ap-southeast-3"
+  "region": "ap-southeast-1"
 }
 ```
 
@@ -105,7 +105,7 @@ docker-compose up --build
 docker run -d \
   --name iac-full-infra-app \
   -p 5000:5000 \
-  -e AWS_REGION=ap-southeast-3 \
+  -e AWS_REGION=ap-southeast-1 \
   -e DB_HOST=your-rds-endpoint \
   -e DB_SECRET_NAME=dev-db-credentials \
   -v ~/.aws:/home/appuser/.aws:ro \
@@ -121,7 +121,7 @@ curl http://localhost:5000/api/info
 | Variable | Default | Description |
 | --- | --- | --- |
 | `APP_NAME` | `iac-full-infra` | Application name displayed on dashboard |
-| `AWS_REGION` | `ap-southeast-3` | AWS region |
+| `AWS_REGION` | `ap-southeast-1` | AWS region |
 | `DB_HOST` | *(empty)* | RDS endpoint (must be set for DB connection) |
 | `DB_NAME` | `appdb` | Database name |
 | `DB_SECRET_NAME` | `dev-db-credentials` | Secrets Manager secret name |
@@ -173,7 +173,7 @@ Once the ECR repository is deployed, push the Docker image:
 
 ```powershell
 # 1. Authenticate Docker to ECR
-aws ecr get-login-password --region ap-southeast-3 | docker login --username AWS --password-stdin $(terraform output -raw ecr_repository_url)
+aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin $(terraform output -raw ecr_repository_url)
 
 # 2. Tag the local image with the ECR repository URL
 $ECR_URL = terraform output -raw ecr_repository_url
@@ -193,7 +193,7 @@ docker push ${ECR_URL}:v1.0.0
 ### Pull Image from ECR
 
 ```powershell
-aws ecr get-login-password --region ap-southeast-3 | docker login --username AWS --password-stdin $(terraform output -raw ecr_repository_url)
+aws ecr get-login-password --region ap-southeast-1 | docker login --username AWS --password-stdin $(terraform output -raw ecr_repository_url)
 docker pull $(terraform output -raw ecr_repository_url):latest
 ```
 
@@ -311,7 +311,7 @@ terraform apply "tfplan"
 After deployment, configure kubectl:
 
 ```powershell
-aws eks update-kubeconfig --name iac-full-infra-eks --region ap-southeast-3
+aws eks update-kubeconfig --name iac-full-infra-eks --region ap-southeast-1
 kubectl get nodes
 ```
 
@@ -431,7 +431,7 @@ The dev environment is configured to store Terraform state in S3:
 ```hcl
 bucket       = "iac-tfstate-407772390483"
 key          = "dev/terraform.tfstate"
-region       = "ap-southeast-3"
+region       = "ap-southeast-1"
 use_lockfile = true
 encrypt      = true
 ```
@@ -486,10 +486,10 @@ Expected DB result:
 Edit [environments/dev/terraform.tfvars](environments/dev/terraform.tfvars):
 
 ```hcl
-aws_region = "ap-southeast-3"
+aws_region = "ap-southeast-1"
 
 vpc_cidr = "10.0.0.0/16"
-azs      = ["ap-southeast-3a", "ap-southeast-3b"]
+azs      = ["ap-southeast-1a", "ap-southeast-1b"]
 
 enable_asg           = true
 asg_desired_capacity = 2
@@ -538,11 +538,11 @@ curl.exe "http://$ALB/api/info"
 
 aws elbv2 describe-target-health `
   --target-group-arn $TG `
-  --region ap-southeast-3
+  --region ap-southeast-1
 
 aws autoscaling describe-auto-scaling-groups `
   --auto-scaling-group-names app-asg `
-  --region ap-southeast-3
+  --region ap-southeast-1
 ```
 
 Healthy target group output should show each target with:

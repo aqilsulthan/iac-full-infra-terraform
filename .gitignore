@@ -38,3 +38,5 @@ package-lock.json
 github-oidc-trust.json
 
 script.md
+deploy.ps1
+destroy.ps1

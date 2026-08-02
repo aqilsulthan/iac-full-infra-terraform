@@ -25,4 +25,4 @@ resource "aws_db_instance" "app_db" {
   tags = merge(var.tags, {
     Name = "app-db"
   })
-}
+} 

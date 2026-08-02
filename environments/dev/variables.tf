@@ -6,7 +6,7 @@
 variable "aws_region" {
   description = "AWS region untuk deployment"
   type        = string
-  default     = "ap-southeast-3"
+  default     = "ap-southeast-1"
 }
 
 # ---- VPC ----
@@ -19,7 +19,7 @@ variable "vpc_cidr" {
 variable "azs" {
   description = "Availability Zones untuk deployment"
   type        = list(string)
-  default     = ["ap-southeast-3a", "ap-southeast-3b"]
+  default     = ["ap-southeast-1a", "ap-southeast-1b"]
 }
 
 variable "enable_nat_gateway" {
