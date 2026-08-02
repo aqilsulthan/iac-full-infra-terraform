@@ -20,7 +20,6 @@ concurrency:
 env:
   AWS_REGION: ap-southeast-1
   TF_IN_AUTOMATION: "true"
-  TF_VAR_db_password: ${{ secrets.DB_PASSWORD }}
   TF_VAR_app_ingress_cidr_blocks: ${{ vars.APP_INGRESS_CIDR_BLOCKS }}
 
 jobs:
