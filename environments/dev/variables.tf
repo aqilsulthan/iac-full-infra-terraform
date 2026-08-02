@@ -136,11 +136,11 @@ variable "db_username" {
   sensitive   = true
 }
 
-variable "db_password" {
-  description = "Password untuk database (gunakan Secrets Manager di production)"
-  type        = string
-  sensitive   = true
-}
+# variable "db_password" {
+#   description = "Password untuk database (gunakan Secrets Manager di production)"
+#   type        = string
+#   sensitive   = true
+# }
 
 # ---- Secrets Manager ----
 variable "db_secret_name" {

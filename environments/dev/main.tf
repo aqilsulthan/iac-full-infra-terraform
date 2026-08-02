@@ -1,7 +1,7 @@
 terraform {
   required_version = ">= 1.5.0"
   backend "s3" {
-    bucket       = "iac-tfstate-407772390483"
+    bucket       = "iac-tfstate-123456789012"
     key          = "dev/terraform.tfstate"
     region       = "ap-southeast-1"
     use_lockfile = true
@@ -141,7 +141,7 @@ module "db_secret" {
   secret_name = var.db_secret_name
   secret_string = jsonencode({
     username = var.db_username
-    password = var.db_password
+    password = random_password.db_password.result
   })
 }
 
@@ -165,6 +165,7 @@ module "db" {
   password               = local.db_creds.password
   subnet_ids             = module.vpc.private_subnet_ids
   vpc_security_group_ids = [aws_security_group.db_sg.id]
+  environment            = var.environment
   tags                   = local.common_tags
 }
 
@@ -252,6 +253,13 @@ resource "aws_cloudwatch_metric_alarm" "cpu_high" {
   }
 
   alarm_actions = [aws_autoscaling_policy.scale_out[0].arn]
+}
+
+# Generate password acak sepanjang 16 karakter
+resource "random_password" "db_password" {
+  length           = 16
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
 }
 
 
