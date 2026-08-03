@@ -114,6 +114,9 @@ module "alb" {
   target_instance_ids = var.enable_asg ? [] : module.ec2[0].instance_ids
   tags                = local.common_tags
   depends_on          = [module.vpc]
+
+  # (jika sudah punya domain pribadi, Aktifkan HTTPS:
+  # certificate_arn     = "arn:aws:acm:ap-southeast-1:123456789012:certificate/xxxx-xxxx-xxxx"
 }
 
 resource "aws_security_group" "db_sg" {

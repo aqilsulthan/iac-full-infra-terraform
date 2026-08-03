@@ -68,5 +68,5 @@ fi
 
 echo ""
 echo "🎉 Backend resources ready! Now run:"
-echo "   cd environments/dev"
+echo "   cd environments/<environment>"
 echo "   terraform init -migrate-state"

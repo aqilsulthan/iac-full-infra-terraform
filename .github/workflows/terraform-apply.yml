@@ -2,13 +2,23 @@ name: Terraform Apply
 
 on:
   workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Pilih Environment yang ingin di-deploy:'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
 
 permissions:
   id-token: write
   contents: read
 
 concurrency:
-  group: terraform-apply-dev
+  group: terraform-apply-${{ github.event.inputs.target_env }}
   cancel-in-progress: false
 
 env:
@@ -18,10 +28,9 @@ env:
 
 jobs:
   apply:
-    name: Apply dev
+    name: Apply (${{ github.event.inputs.target_env }})
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    environment: dev
+    environment: ${{ github.event.inputs.target_env }}
 
     steps:
       - name: Checkout
@@ -43,13 +52,13 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform init
-        run: terraform -chdir=environments/dev init -input=false
+        run: terraform -chdir=environments/${{ github.event.inputs.target_env }} init -input=false
 
       - name: Terraform validate
-        run: terraform -chdir=environments/dev validate
+        run: terraform -chdir=environments/${{ github.event.inputs.target_env }} validate
 
       - name: Terraform plan
-        run: terraform -chdir=environments/dev plan -input=false -no-color -out=tfplan
+        run: terraform -chdir=environments/${{ github.event.inputs.target_env }} plan -input=false -no-color -out=tfplan
 
       - name: Terraform apply
-        run: terraform -chdir=environments/dev apply -input=false -auto-approve tfplan
+        run: terraform -chdir=environments/${{ github.event.inputs.target_env }} apply -input=false -auto-approve tfplan

@@ -3,10 +3,21 @@ name: Terraform Plan
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+    branches: [master, staging, develop]
     paths:
       - "**/*.tf"
       - ".github/workflows/**"
   workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Pilih Environment yang ingin di-plan:'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
 
 permissions:
   id-token: write
@@ -24,10 +35,27 @@ env:
 
 jobs:
   plan:
-    name: Plan dev
+    name: Plan
     runs-on: ubuntu-latest
 
     steps:
+      - name: Determine Environment
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            TARGET="${{ github.event.inputs.target_env }}"
+          else
+            if [ "${{ github.base_ref }}" == "master" ]; then
+              TARGET="prod"
+            elif [ "${{ github.base_ref }}" == "staging" ]; then
+              TARGET="staging"
+            else
+              TARGET="dev"
+            fi
+          fi
+          echo "target_env=$TARGET" >> $GITHUB_OUTPUT
+          echo "env_dir=environments/$TARGET" >> $GITHUB_OUTPUT
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -47,14 +75,13 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform init
-        run: terraform -chdir=environments/dev init -input=false
+        run: terraform -chdir=${{ steps.set-env.outputs.env_dir }} init -input=false
 
       - name: Terraform validate
-        run: terraform -chdir=environments/dev validate
+        run: terraform -chdir=${{ steps.set-env.outputs.env_dir }} validate
 
       - name: Terraform plan
-        id: plan
-        run: terraform -chdir=environments/dev plan -input=false -no-color -out=tfplan
+        run: terraform -chdir=${{ steps.set-env.outputs.env_dir }} plan -input=false -no-color -out=tfplan
 
       - name: Comment PR
         if: github.event_name == 'pull_request'
@@ -63,11 +90,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const body = [
-              "#### Terraform Plan",
+              `#### Terraform Plan (${{ steps.set-env.outputs.target_env }})`,
               "",
               "Status: success",
-              `Actor: @${{ github.actor }}`,
-              `Workflow: ${{ github.workflow }}`
+              `Target Env: \`${{ steps.set-env.outputs.env_dir }}\``,
+              `Actor: @${{ github.actor }}`
             ].join("\n");
 
             github.rest.issues.createComment({

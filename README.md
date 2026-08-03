@@ -10,14 +10,14 @@ The project supports **two deployment modes**, the original EC2/ASG mode and the
 
 ```text
 User
-  -> Application Load Balancer :80
+   -> Application Load Balancer (HTTP/HTTPS Ready)
   -> Auto Scaling Group across 2 public subnets
   -> EC2 Ubuntu 22.04 instances
   -> Nginx reverse proxy
   -> Gunicorn
   -> Flask application
-  -> AWS Secrets Manager for DB credentials
-  -> Private RDS MySQL
+  -> AWS Secrets Manager (Auto-generated zero-knowledge password)
+  -> Encrypted Private RDS MySQL
 ```
 
 ### Mode 2: EKS / Kubernetes (Recommended)
@@ -71,11 +71,11 @@ ALB -> ASG/EC2 -> Nginx -> Gunicorn -> Flask -> Secrets Manager -> RDS
 | Layer | AWS resource | Purpose |
 | --- | --- | --- |
 | Network | VPC, public/private subnets, IGW | Isolated network foundation (subnets tagged for ALB auto-discovery) |
-| Entry point | Application Load Balancer | Public HTTP access and health checks |
+| Entry point | Application Load Balancer | Public HTTP/HTTPS access and health checks |
 | Compute | Auto Scaling Group / EKS Node Group | Highly available app instances |
 | App runtime | Gunicorn, Flask (containerized) | Web application stack |
-| Data | RDS MySQL | Private relational database |
-| Secrets | AWS Secrets Manager | Database credential storage |
+| Data | RDS MySQL | Encrypted private relational database |
+| Secrets | AWS Secrets Manager | Auto-generated zero-knowledge database credential storage |
 | Identity | IAM role and instance profile / IRSA | Permissions for AWS APIs |
 | Observability | CloudWatch Agent, EKS logs | Basic monitoring and scale-out |
 
@@ -202,11 +202,13 @@ docker pull $(terraform output -raw ecr_repository_url):latest
 ```text
 .
 |-- environments/
-|   `-- dev/
-|       |-- main.tf
-|       |-- variables.tf
-|       |-- outputs.tf
-|       `-- terraform.tfvars
+|   |-- dev/
+|   |   |-- main.tf
+|   |   |-- variables.tf
+|   |   |-- outputs.tf
+|   |   `-- terraform.tfvars
+|   |-- staging/
+|   `-- prod/
 |-- kubernetes/
 |   |-- namespace.yaml
 |   |-- configmap.yaml
@@ -450,8 +452,6 @@ The script creates the S3 state bucket with versioning, encryption, and public a
 ```powershell
 cd C:\iac-full-infra-terraform\environments\dev
 
-$env:TF_VAR_db_password = "replace-with-a-strong-password"
-
 terraform init
 terraform fmt -check -recursive ..\..
 terraform validate
@@ -519,12 +519,6 @@ For a public repository, do not commit real secrets. Prefer:
 - `.gitignore` for real `terraform.tfvars`
 - AWS Secrets Manager, SSM Parameter Store, or CI/CD secrets for sensitive values
 
-For local runs, provide the DB password through an environment variable instead of committing it:
-
-```powershell
-$env:TF_VAR_db_password = "replace-with-a-strong-password"
-```
-
 ## Operational Validation
 
 Run these after deployment:
@@ -567,22 +561,21 @@ GitHub Actions workflows are included:
 - `.github/workflows/terraform-plan.yml`
 - `.github/workflows/terraform-apply.yml`
 
-They are designed for AWS OIDC authentication and run Terraform against `environments/dev`.
+They are designed for AWS OIDC authentication and dynamically support `dev`, `staging`, and `prod` environments based on the target branch or manual inputs.
 
 Required GitHub configuration:
 
 | Type | Name | Purpose |
 | --- | --- | --- |
 | Secret | `AWS_ROLE_TO_ASSUME` | IAM role assumed through GitHub OIDC |
-| Secret | `DB_PASSWORD` | Injected as `TF_VAR_db_password` |
 | Variable | `APP_INGRESS_CIDR_BLOCKS` | Injected as `TF_VAR_app_ingress_cidr_blocks` |
 
 Workflow behavior:
 
 | Workflow | Trigger | Notes |
 | --- | --- | --- |
-| `Terraform Plan` | Pull requests that touch Terraform/workflow files, or manual dispatch | Runs fmt, init, validate, plan, and comments on PRs |
-| `Terraform Apply` | Manual dispatch | Runs only on `refs/heads/master` and targets the `dev` environment |
+| `Terraform Plan` | Pull requests (`master`, `staging`, `develop`) or manual dispatch | Dynamically resolves the target environment, runs fmt, init, validate, plan, and comments on PRs |
+| `Terraform Apply` | Manual dispatch | Prompts for target environment dropdown (`dev`, `staging`, `prod`) and runs apply safely with GitHub environment protection |
 
 Before using these workflows in another AWS account or GitHub repository, update:
 
@@ -590,14 +583,14 @@ Before using these workflows in another AWS account or GitHub repository, update
 - AWS region if needed
 - IAM trust policy for the repository
 
-## Security Notes
+## Security & Enterprise Best Practices
 
-- RDS is private and not publicly accessible.
-- App instances access RDS through security groups.
-- DB credentials are stored in Secrets Manager.
-- EC2 uses an IAM instance profile rather than static AWS keys.
-- ALB exposes HTTP port `80` publicly.
-- Direct app ingress is restricted by `app_ingress_cidr_blocks`.
+- **Zero-Knowledge Secrets:** Database passwords are auto-generated via Terraform's `random_password` and pushed directly to AWS Secrets Manager. No human interaction or CI/CD secrets are required.
+- **Data at Rest Encryption:** RDS storage is fully encrypted with AWS KMS.
+- **Multi-Environment GitOps:** Infrastructure is cleanly separated into `dev`, `staging`, and `prod` directories with isolated state files and parameter sets.
+- **Secure Transport:** Application Load Balancer module is HTTPS-ready (Port 443) with dynamic certificate attachment support.
+- **Network Isolation:** RDS is strictly private and only accessible by App instances through specific security groups.
+- **Identity-Based Access:** EC2 and EKS nodes use IAM instance profiles (IRSA) rather than static AWS keys to fetch secrets.
 
 ## Cost Notes
 

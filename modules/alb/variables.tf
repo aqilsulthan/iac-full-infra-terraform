@@ -7,3 +7,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "certificate_arn" {
+  description = "ARN sertifikat ACM untuk HTTPS. Jika kosong, ALB hanya menggunakan HTTP."
+  type        = string
+  default     = ""
+}
